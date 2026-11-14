@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import libroRoutes from './libro.routes.js';
 
 const router = Router();
 
@@ -12,5 +13,7 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+router.use('/libros', libroRoutes);
 
 export default router;
