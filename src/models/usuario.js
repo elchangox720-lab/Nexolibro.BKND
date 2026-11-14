@@ -3,15 +3,17 @@ import mongoose from 'mongoose';
 
 const usuarioSchema = new mongoose.Schema(
   {
-    nombre: { type: String, required: true, trim: true },
+    nombre: { type: String, required: true, trim: true, maxlength: 80 },
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
       trim: true,
+      maxlength: 120,
     },
-    password: { type: String, required: true, minlength: 6, select: false },
+    password: { type: String, required: true, minlength: 8, maxlength: 72, select: false },
+    rol: { type: String, enum: ['usuario', 'admin'], default: 'usuario' },
   },
   { timestamps: true }
 );

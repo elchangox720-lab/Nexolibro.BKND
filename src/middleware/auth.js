@@ -24,3 +24,11 @@ export async function autenticar(req, res, next) {
     res.status(401).json({ message: 'Token inválido o expirado' });
   }
 }
+
+export function soloAdmin(req, res, next) {
+  if (req.usuario?.rol !== 'admin') {
+    return res.status(403).json({ message: 'Se requieren permisos de administrador' });
+  }
+
+  next();
+}

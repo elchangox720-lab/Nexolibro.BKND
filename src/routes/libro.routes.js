@@ -6,13 +6,14 @@ import {
   listarLibros,
   obtenerLibro,
 } from '../controllers/libro.controller.js';
+import { autenticar, soloAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/', listarLibros);
 router.get('/:id', obtenerLibro);
-router.post('/', crearLibro);
-router.put('/:id', actualizarLibro);
-router.delete('/:id', eliminarLibro);
+router.post('/', autenticar, soloAdmin, crearLibro);
+router.put('/:id', autenticar, soloAdmin, actualizarLibro);
+router.delete('/:id', autenticar, soloAdmin, eliminarLibro);
 
 export default router;
