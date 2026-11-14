@@ -8,11 +8,14 @@ import routes from './routes/index.js';
 const app = express();
 
 const origenesPermitidos = (
-  process.env.CORS_ORIGINS ?? 'https://nexolibro-eifu.vercel.app,http://localhost:4200'
+  process.env.CORS_ORIGINS ??
+  'https://nexolibro-eifu.vercel.app,http://localhost:4200,http://127.0.0.1:4200'
 )
   .split(',')
   .map((origen) => origen.trim())
   .filter(Boolean);
+
+const origenesVercel = /^https:\/\/nexolibro(?:-[a-z0-9-]+)*\.vercel\.app$/i;
 
 app.set('trust proxy', 1);
 
@@ -25,7 +28,7 @@ app.use(
 app.use(
   cors({
     origin(origen, callback) {
-      if (!origen || origenesPermitidos.includes(origen)) {
+      if (!origen || origenesPermitidos.includes(origen) || origenesVercel.test(origen)) {
         return callback(null, true);
       }
       return callback(new Error('Origen no permitido'));
