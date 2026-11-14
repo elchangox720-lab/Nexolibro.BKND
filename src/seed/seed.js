@@ -3,31 +3,53 @@ import mongoose from 'mongoose';
 import Libro from '../models/libro.js';
 
 import accion from './data/accion.js';
+import accion2 from './data/accion-2.js';
 import base from './data/base.js';
 import cienciaFiccion from './data/ciencia-ficcion.js';
+import cienciaFiccion2 from './data/ciencia-ficcion-2.js';
 import clasicos from './data/clasicos.js';
+import clasicos2 from './data/clasicos-2.js';
 import comics from './data/comics.js';
+import comics2 from './data/comics-2.js';
 import fantasia from './data/fantasia.js';
+import fantasia2 from './data/fantasia-2.js';
 import manga from './data/manga.js';
+import manga2 from './data/manga-2.js';
 import manhwa from './data/manhwa.js';
+import manhwa2 from './data/manhwa-2.js';
 import misterio from './data/misterio.js';
+import misterio2 from './data/misterio-2.js';
 import novelas from './data/novelas.js';
+import novelas2 from './data/novelas-2.js';
 import romance from './data/romance.js';
+import romance2 from './data/romance-2.js';
 import terror from './data/terror.js';
+import terror2 from './data/terror-2.js';
 
 const todos = [
   ...base,
   ...novelas,
+  ...novelas2,
   ...fantasia,
+  ...fantasia2,
   ...romance,
+  ...romance2,
   ...terror,
+  ...terror2,
   ...misterio,
+  ...misterio2,
   ...cienciaFiccion,
+  ...cienciaFiccion2,
   ...accion,
+  ...accion2,
   ...clasicos,
+  ...clasicos2,
   ...manga,
+  ...manga2,
   ...manhwa,
+  ...manhwa2,
   ...comics,
+  ...comics2,
 ];
 
 function normalizar(texto) {
