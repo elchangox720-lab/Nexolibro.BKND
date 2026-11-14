@@ -4,6 +4,7 @@ const libroSchema = new mongoose.Schema(
   {
     titulo: { type: String, required: true, trim: true },
     autor: { type: String, required: true, trim: true },
+    tipo: { type: String, trim: true, default: 'Novela' },
     isbn: { type: String, trim: true, unique: true, sparse: true },
     editorial: { type: String, trim: true },
     anio: { type: Number, min: 0 },
