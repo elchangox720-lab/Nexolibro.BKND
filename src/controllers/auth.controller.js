@@ -23,6 +23,10 @@ function manejarError(res, error) {
 
 export async function registrar(req, res) {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ message: 'El registro no está configurado en el servidor' });
+    }
+
     const { nombre, email, password } = req.body;
 
     if (!nombre || !email || !password) {
@@ -49,6 +53,10 @@ export async function registrar(req, res) {
 
 export async function login(req, res) {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ message: 'El inicio de sesión no está configurado en el servidor' });
+    }
+
     const { email, password } = req.body;
 
     if (!email || !password) {
