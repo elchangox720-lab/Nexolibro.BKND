@@ -19,7 +19,7 @@ export async function connectDB() {
     console.warn('MongoDB desconectado');
   });
 
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, { dbName: process.env.MONGODB_DB || 'nexolibro' });
 
   return mongoose.connection;
 }

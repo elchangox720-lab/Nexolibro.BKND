@@ -5,6 +5,10 @@ const PORT = process.env.PORT || 3000;
 
 async function start() {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.warn('ADVERTENCIA: JWT_SECRET no está definida; registro e inicio de sesión fallarán.');
+    }
+
     await connectDB();
 
     app.listen(PORT, () => {

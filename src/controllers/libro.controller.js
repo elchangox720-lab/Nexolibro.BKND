@@ -51,7 +51,7 @@ export async function crearLibro(req, res) {
 export async function actualizarLibro(req, res) {
   try {
     const libro = await Libro.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+      returnDocument: 'after',
       runValidators: true,
     });
     if (!libro) {
