@@ -1,5 +1,6 @@
 import app from './app.js';
 import { connectDB } from './config/db.js';
+import { iniciarAutomatizacion } from './services/mantenimiento.service.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -13,6 +14,7 @@ async function start() {
 
     app.listen(PORT, () => {
       console.log(`Servidor Nexolibro corriendo en http://localhost:${PORT}`);
+      iniciarAutomatizacion();
     });
   } catch (error) {
     console.error('No se pudo iniciar el servidor:', error.message);

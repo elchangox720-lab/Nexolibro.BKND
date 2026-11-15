@@ -13,8 +13,16 @@ const libroSchema = new mongoose.Schema(
     stock: { type: Number, min: 0, default: 0 },
     descripcion: { type: String, trim: true },
     portada: { type: String, trim: true },
+    origen: { type: String, enum: ['manual', 'automatico'], default: 'manual' },
+    fuente: { type: String, trim: true },
+    fuenteId: { type: String, trim: true },
+    fuenteUrl: { type: String, trim: true },
+    origenDescripcion: { type: String, trim: true },
+    lote: { type: String, trim: true, index: true },
   },
   { timestamps: true }
 );
+
+libroSchema.index({ fuenteId: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Libro', libroSchema);
