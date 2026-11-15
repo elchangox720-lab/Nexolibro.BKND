@@ -481,14 +481,20 @@ async function tituloEspanolOpenLibrary(candidato) {
   try {
     const clave = candidato.fuenteId.replace(/^openlibrary:/, '');
     const datos = await pedirJson(`https://openlibrary.org${clave}/editions.json?limit=50`);
-    const entradas = datos.entries ?? [];
-    const espanol = entradas.find(
-      (entrada) =>
-        entrada.title &&
-        (entrada.languages ?? []).some((idioma) => /\/languages\/(spa|es)$/.test(idioma.key ?? ''))
+    const entradas = (datos.entries ?? []).filter((entrada) => entrada.title);
+    const espanol = entradas.find((entrada) =>
+      (entrada.languages ?? []).some((idioma) => /\/languages\/(spa|es)$/.test(idioma.key ?? ''))
     );
 
-    return String(espanol?.title ?? '').trim();
+    if (espanol) {
+      return String(espanol.title).trim();
+    }
+
+    const ingles = entradas.find((entrada) =>
+      (entrada.languages ?? []).some((idioma) => /\/languages\/eng$/.test(idioma.key ?? ''))
+    );
+
+    return String(ingles?.title ?? '').trim();
   } catch {
     return '';
   }
@@ -610,7 +616,7 @@ async function descripcionOpenLibrary(candidato) {
   }
 }
 
-async function traducirEspanol(texto) {
+async function traducirGoogle(texto) {
   try {
     const parametros = new URLSearchParams({
       client: 'gtx',
@@ -633,6 +639,61 @@ async function traducirEspanol(texto) {
   }
 }
 
+function idiomaProbable(texto) {
+  if (/[ąćęłńóśźż]/i.test(texto)) {
+    return 'pl';
+  }
+
+  if (/[ãõç]/i.test(texto)) {
+    return 'pt';
+  }
+
+  return 'en';
+}
+
+async function traducirMyMemory(texto) {
+  try {
+    const limpio = limpiarHtml(texto).slice(0, 1800);
+    const idioma = idiomaProbable(limpio);
+    const partes = [];
+
+    for (let inicio = 0; inicio < limpio.length; inicio += 450) {
+      const parte = limpio.slice(inicio, inicio + 450);
+      const parametros = new URLSearchParams({
+        q: parte,
+        langpair: `${idioma}|es`,
+      });
+      const datos = await pedirJson(
+        `https://api.mymemory.translated.net/get?${parametros}`,
+        {},
+        20000
+      );
+      const traduccion = datos?.responseData?.translatedText;
+
+      if (!traduccion || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(traduccion)) {
+        return '';
+      }
+
+      partes.push(traduccion);
+      await esperar(120);
+    }
+
+    return recortarDescripcion(partes.join(' '), 900);
+  } catch {
+    return '';
+  }
+}
+
+async function traducirEspanol(texto) {
+  const google = await traducirGoogle(texto);
+
+  if (google) {
+    return google;
+  }
+
+  return traducirMyMemory(texto);
+}
+
 function descripcionGenerica(candidato, genero) {
   const temas = candidato.temas?.length
     ? ` La obra se relaciona con temas como ${candidato.temas.join(', ')}.`
@@ -641,7 +702,7 @@ function descripcionGenerica(candidato, genero) {
   return `${candidato.titulo} es una obra de ${genero.nombre.toLowerCase()} escrita por ${candidato.autor} y publicada en ${candidato.anio}.${temas} Forma parte del catálogo de Nexolibro y está disponible para conocer más sobre su historia y su autor.`;
 }
 
-async function completarDescripcion(candidato, genero, advertencias) {
+export async function completarDescripcion(candidato, genero, advertencias) {
   const tituloEspanol =
     candidato.fuente === 'Open Library' ? await tituloEspanolOpenLibrary(candidato) : '';
   const wiki = await buscarWikipedia(
