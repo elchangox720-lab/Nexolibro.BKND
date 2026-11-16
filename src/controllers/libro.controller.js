@@ -1,3 +1,4 @@
+import Alquiler from '../models/alquiler.js';
 import Libro from '../models/libro.js';
 
 function manejarError(res, error) {
@@ -65,6 +66,17 @@ export async function actualizarLibro(req, res) {
 
 export async function eliminarLibro(req, res) {
   try {
+    const activos = await Alquiler.countDocuments({
+      libro: req.params.id,
+      estado: 'activo',
+    });
+
+    if (activos > 0) {
+      return res.status(409).json({
+        message: 'No se puede eliminar un libro con alquileres activos',
+      });
+    }
+
     const libro = await Libro.findByIdAndDelete(req.params.id);
     if (!libro) {
       return res.status(404).json({ message: 'Libro no encontrado' });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import alquilerRoutes from './alquiler.routes.js';
 import authRoutes from './auth.routes.js';
 import bibliotecaRoutes from './biblioteca.routes.js';
 import historialRoutes from './historial.routes.js';
@@ -19,6 +20,7 @@ router.get('/health', (req, res) => {
   });
 });
 
+router.use('/alquileres', alquilerRoutes);
 router.use('/auth', authRoutes);
 router.use('/biblioteca', bibliotecaRoutes);
 router.use('/historial', historialRoutes);
