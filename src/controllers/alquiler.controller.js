@@ -38,6 +38,10 @@ function serializar(alquiler) {
   return { ...base, vencido, diasRestantes };
 }
 
+function normalizarCedula(valor) {
+  return String(valor ?? '').replace(/[.\s-]/g, '');
+}
+
 function leerDias(valor) {
   if (valor === undefined || valor === null || valor === '') {
     return DIAS_POR_DEFECTO;
@@ -117,6 +121,13 @@ export async function crearAlquiler(req, res) {
       return res.status(400).json({ message: `Los días deben estar entre 1 y ${DIAS_MAXIMOS}` });
     }
 
+    const cedula = normalizarCedula(req.body?.cedula);
+    if (!/^\d{6,10}$/.test(cedula)) {
+      return res.status(400).json({
+        message: 'Ingresa un número de cédula válido, entre 6 y 10 dígitos',
+      });
+    }
+
     const [mismoLibro, activos] = await Promise.all([
       Alquiler.exists({ usuario: req.usuarioId, libro: libroId, estado: 'activo' }),
       Alquiler.countDocuments({ usuario: req.usuarioId, estado: 'activo' }),
@@ -155,6 +166,7 @@ export async function crearAlquiler(req, res) {
         titulo: libro.titulo,
         autor: libro.autor,
         portada: libro.portada,
+        cedula,
         dias,
         fechaAlquiler,
         fechaVencimiento,

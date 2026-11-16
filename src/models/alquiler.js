@@ -17,6 +17,13 @@ const alquilerSchema = new mongoose.Schema(
     titulo: { type: String, required: true },
     autor: { type: String },
     portada: { type: String },
+    cedula: {
+      type: String,
+      required: true,
+      trim: true,
+      match: /^\d{6,10}$/,
+      index: true,
+    },
     dias: { type: Number, required: true, min: 1, max: 30 },
     fechaAlquiler: { type: Date, required: true, default: Date.now },
     fechaVencimiento: { type: Date, required: true },
