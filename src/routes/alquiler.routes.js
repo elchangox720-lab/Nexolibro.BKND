@@ -3,6 +3,7 @@ import {
   crearAlquiler,
   devolverAlquiler,
   devolverAlquilerAdmin,
+  leerAlquiler,
   listarAlquileres,
   listarAlquileresAdmin,
 } from '../controllers/alquiler.controller.js';
@@ -17,6 +18,7 @@ router.post('/admin/:id/devolver', soloAdmin, devolverAlquilerAdmin);
 
 router.get('/', listarAlquileres);
 router.post('/', crearAlquiler);
+router.get('/:id/lectura', leerAlquiler);
 router.post('/:id/devolver', devolverAlquiler);
 
 export default router;

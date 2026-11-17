@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Alquiler from '../models/alquiler.js';
 import Libro from '../models/libro.js';
+import { resolverLectura } from '../services/lectura.service.js';
 
 const DIAS_POR_DEFECTO = 14;
 const DIAS_MAXIMOS = 30;
@@ -34,8 +35,18 @@ function serializar(alquiler) {
         Math.ceil((new Date(base.fechaVencimiento).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
       )
     : 0;
+  const lectura = activo && !vencido ? resolverLectura(base) : null;
 
-  return { ...base, vencido, diasRestantes };
+  return {
+    ...base,
+    vencido,
+    diasRestantes,
+    lecturaDisponible: Boolean(lectura),
+    lecturaPaginas: lectura?.paginas ?? null,
+    lecturaLicencia: lectura?.licencia ?? null,
+    lecturaFuente: lectura?.fuente ?? null,
+    lecturaFuenteUrl: lectura?.fuenteUrl ?? null,
+  };
 }
 
 function normalizarCedula(valor) {
@@ -204,6 +215,61 @@ export async function devolverAlquiler(req, res) {
     }
 
     res.json(serializar(alquiler));
+  } catch (error) {
+    manejarError(res, error);
+  }
+}
+
+export async function leerAlquiler(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'ID de alquiler inválido' });
+    }
+
+    const alquiler = await Alquiler.findOne({ _id: id, usuario: req.usuarioId }).lean();
+
+    if (!alquiler) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    if (alquiler.estado !== 'activo') {
+      return res.status(403).json({
+        message: 'Este alquiler ya fue devuelto. El archivo de lectura no está disponible.',
+      });
+    }
+
+    if (new Date(alquiler.fechaVencimiento).getTime() <= Date.now()) {
+      return res.status(403).json({
+        message: 'Tu alquiler venció. El archivo de lectura ya no está disponible.',
+      });
+    }
+
+    const lectura = resolverLectura(alquiler);
+
+    if (!lectura) {
+      return res.status(404).json({
+        message: 'Archivo de lectura no disponible para este libro.',
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${lectura.archivo}"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+
+    return res.sendFile(lectura.ruta, (error) => {
+      if (!error || res.headersSent) {
+        if (error) {
+          console.error('No se pudo enviar el archivo de lectura', error);
+        }
+        return;
+      }
+
+      res.removeHeader('Content-Disposition');
+      manejarError(res, error);
+    });
   } catch (error) {
     manejarError(res, error);
   }
