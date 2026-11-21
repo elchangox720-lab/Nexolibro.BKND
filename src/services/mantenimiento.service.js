@@ -211,20 +211,6 @@ export async function ejecutarRevision() {
       advertencias.push(`No se pudo validar la integridad de reseñas: ${error.message}`);
     }
 
-    const estado = await obtenerEstado();
-    const ahora = new Date();
-
-    if (
-      estado.ultimaGeneracion &&
-      ahora.getTime() - estado.ultimaGeneracion.getTime() > INTERVALO_GENERACION_MS + 2 * 60 * 60 * 1000
-    ) {
-      advertencias.push('La generación diaria de libros está atrasada');
-    }
-
-    if (!estado.ultimaGeneracion) {
-      advertencias.push('Todavía no se ha ejecutado una generación automática');
-    }
-
     const estadoFinal = errores.length ? 'error' : advertencias.length ? 'advertencia' : 'ok';
     const fin = new Date();
 
@@ -516,13 +502,7 @@ export function iniciarAutomatizacion() {
     );
   }, 15000);
 
-  setTimeout(() => {
-    programarProximaGeneracion().catch((error) =>
-      console.error('No se pudo iniciar la generación programada:', error)
-    );
-  }, 20000);
-
   console.log(
-    `Automatización iniciada: revisión cada hora y generación de 10 libros cada 24 horas (${ZONA_HORARIA})`
+    `Automatización iniciada: revisión cada hora; generación automática deshabilitada (${ZONA_HORARIA})`
   );
 }

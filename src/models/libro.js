@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { resolverLectura } from '../services/lectura.service.js';
 
 const libroSchema = new mongoose.Schema(
   {
@@ -22,6 +23,15 @@ const libroSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+libroSchema.pre('validate', function () {
+  if (!resolverLectura({ titulo: this.titulo, autor: this.autor })) {
+    this.invalidate(
+      'titulo',
+      'Solo se permiten libros con un PDF legible de dominio público'
+    );
+  }
+});
 
 libroSchema.index({ fuenteId: 1 }, { unique: true, sparse: true });
 
