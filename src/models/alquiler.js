@@ -30,12 +30,33 @@ const alquilerSchema = new mongoose.Schema(
     fechaDevolucion: { type: Date },
     estado: {
       type: String,
-      enum: ['activo', 'devuelto'],
+      enum: ['pendiente_pago', 'activo', 'devuelto', 'cancelado'],
       default: 'activo',
       index: true,
     },
     valorLibro: { type: Number, min: 0, default: 0 },
     devueltoPor: { type: String, enum: ['usuario', 'admin'] },
+
+    pagoEstado: {
+      type: String,
+      enum: ['no_requerido', 'pendiente', 'aprobado', 'rechazado', 'reembolsado'],
+      default: 'no_requerido',
+      index: true,
+    },
+    pago: { type: mongoose.Schema.Types.ObjectId, ref: 'Pago' },
+    referenciaPago: { type: String, trim: true, index: true },
+    checkoutUrl: { type: String },
+    pagoExpiraEn: { type: Date },
+    tarifa: { type: Number, min: 0, default: 0 },
+    montoPagado: { type: Number, min: 0, default: 0 },
+    fechaPago: { type: Date },
+    renovaciones: { type: Number, min: 0, default: 0 },
+
+    multa: { type: Number, min: 0, default: 0 },
+    multaPagada: { type: Number, min: 0, default: 0 },
+
+    recordatorioEnviadoEn: { type: Date },
+    ultimoAvisoVencidoEn: { type: Date },
   },
   { timestamps: true }
 );
@@ -47,5 +68,6 @@ alquilerSchema.index(
   { unique: true, partialFilterExpression: { estado: 'activo' } }
 );
 alquilerSchema.index({ estado: 1, fechaVencimiento: 1 });
+alquilerSchema.index({ estado: 1, pagoExpiraEn: 1 });
 
 export default mongoose.model('Alquiler', alquilerSchema);

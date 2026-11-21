@@ -6,6 +6,8 @@ import {
   leerAlquiler,
   listarAlquileres,
   listarAlquileresAdmin,
+  pagarMulta,
+  renovarAlquiler,
 } from '../controllers/alquiler.controller.js';
 import { autenticar, soloAdmin } from '../middleware/auth.js';
 
@@ -18,6 +20,8 @@ router.post('/admin/:id/devolver', soloAdmin, devolverAlquilerAdmin);
 
 router.get('/', listarAlquileres);
 router.post('/', crearAlquiler);
+router.post('/:id/renovar', renovarAlquiler);
+router.post('/:id/pagar-multa', pagarMulta);
 router.get('/:id/lectura', leerAlquiler);
 router.post('/:id/devolver', devolverAlquiler);
 

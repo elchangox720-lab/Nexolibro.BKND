@@ -1,5 +1,6 @@
 import Alquiler from '../models/alquiler.js';
 import Libro from '../models/libro.js';
+import { calcularTarifa, DIAS_BASE, modoPagos } from '../services/pagos.service.js';
 
 function manejarError(res, error) {
   if (error.name === 'ValidationError') {
@@ -19,10 +20,23 @@ function manejarError(res, error) {
   return res.status(500).json({ message: 'Error interno del servidor' });
 }
 
+function serializarLibro(libro) {
+  const base = typeof libro.toObject === 'function' ? libro.toObject() : libro;
+  const modo = modoPagos();
+
+  return {
+    ...base,
+    tarifaAlquiler: modo === 'directo' ? 0 : calcularTarifa(base.precio, DIAS_BASE),
+    tarifaDias: DIAS_BASE,
+    pagoRequerido: modo !== 'directo',
+    modoPagos: modo,
+  };
+}
+
 export async function listarLibros(req, res) {
   try {
-    const libros = await Libro.find().sort({ createdAt: -1 });
-    res.json(libros);
+    const libros = await Libro.find().sort({ createdAt: -1 }).lean();
+    res.json(libros.map(serializarLibro));
   } catch (error) {
     manejarError(res, error);
   }
@@ -34,7 +48,7 @@ export async function obtenerLibro(req, res) {
     if (!libro) {
       return res.status(404).json({ message: 'Libro no encontrado' });
     }
-    res.json(libro);
+    res.json(serializarLibro(libro));
   } catch (error) {
     manejarError(res, error);
   }
@@ -43,7 +57,7 @@ export async function obtenerLibro(req, res) {
 export async function crearLibro(req, res) {
   try {
     const libro = await Libro.create(req.body);
-    res.status(201).json(libro);
+    res.status(201).json(serializarLibro(libro));
   } catch (error) {
     manejarError(res, error);
   }
@@ -58,7 +72,7 @@ export async function actualizarLibro(req, res) {
     if (!libro) {
       return res.status(404).json({ message: 'Libro no encontrado' });
     }
-    res.json(libro);
+    res.json(serializarLibro(libro));
   } catch (error) {
     manejarError(res, error);
   }
@@ -68,12 +82,12 @@ export async function eliminarLibro(req, res) {
   try {
     const activos = await Alquiler.countDocuments({
       libro: req.params.id,
-      estado: 'activo',
+      estado: { $in: ['activo', 'pendiente_pago'] },
     });
 
     if (activos > 0) {
       return res.status(409).json({
-        message: 'No se puede eliminar un libro con alquileres activos',
+        message: 'No se puede eliminar un libro con alquileres activos o pendientes de pago',
       });
     }
 
