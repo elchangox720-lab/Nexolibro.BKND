@@ -1,16 +1,19 @@
 import 'dotenv/config';
+import mongoose from 'mongoose';
 import { connectDB } from '../config/db.js';
 import {
   ejecutarGeneracionDiaria,
   ejecutarRevision,
   obtenerEstadoMantenimiento,
 } from '../services/mantenimiento.service.js';
-import { obtenerLibrosParaGenero } from '../services/libros-externos.service.js';
-import mongoose from 'mongoose';
 
 const argumentos = process.argv.slice(2);
 const tarea = argumentos.find((item) => !item.startsWith('--')) ?? 'estado';
 const forzar = argumentos.includes('--forzar');
+const cantidad = Number(
+  argumentos.find((item) => item.startsWith('--cantidad='))?.split('=')[1] ?? 0
+);
+const lote = argumentos.find((item) => item.startsWith('--lote='))?.split('=')[1];
 
 async function ejecutar() {
   await connectDB();
@@ -19,26 +22,28 @@ async function ejecutar() {
     await ejecutarRevision();
     console.log(JSON.stringify(await obtenerEstadoMantenimiento(), null, 2));
   } else if (tarea === 'generar') {
-    const resultado = await ejecutarGeneracionDiaria({ forzar });
+    const resultado = await ejecutarGeneracionDiaria({
+      forzar,
+      ...(cantidad > 0 ? { cantidad } : {}),
+      ...(lote ? { lote } : {}),
+    });
     console.log(JSON.stringify(resultado, null, 2));
-  } else if (tarea === 'probar') {
-    const genero = argumentos.find((item) => item.startsWith('--genero='))?.split('=')[1];
+  } else if (tarea === 'sembrar') {
+    const resultado = await ejecutarGeneracionDiaria({
+      forzar: true,
+      cantidad: cantidad > 0 ? cantidad : 50,
+      lote: lote || 'carga-inicial-catalogo-validado',
+    });
+    console.log(JSON.stringify(resultado, null, 2));
+  } else if (tarea === 'catalogo') {
     const estado = await obtenerEstadoMantenimiento();
-    const resultado = await obtenerLibrosParaGenero(genero ?? estado.generoActual, 10);
     console.log(
       JSON.stringify(
         {
-          genero: resultado.genero.nombre,
-          libros: resultado.libros.map((libro) => ({
-            titulo: libro.titulo,
-            autor: libro.autor,
-            anio: libro.anio,
-            portada: libro.portada,
-            descripcion: libro.descripcion.slice(0, 160),
-            fuente: libro.fuente,
-          })),
-          errores: resultado.errores,
-          advertencias: resultado.advertencias,
+          totalLibros: estado.totalLibros,
+          totalCatalogo: estado.totalCatalogo,
+          lecturasDisponibles: estado.lecturasDisponibles,
+          pendientes: estado.pendientes,
         },
         null,
         2

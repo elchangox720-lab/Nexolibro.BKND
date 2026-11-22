@@ -1,10 +1,12 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LECTURAS_NUEVAS } from '../data/lecturas-nuevas.js';
+import { LECTURAS_RESERVA } from '../data/lecturas-reserva.js';
 
 const DIRECTORIO_PDF = fileURLToPath(new URL('../storage/pdf/', import.meta.url));
 
-const CATALOGO_LECTURAS = [
+const CATALOGO_BASE = [
   {
     titulo: 'Frankenstein',
     autor: 'Mary Shelley',
@@ -108,6 +110,8 @@ const CATALOGO_LECTURAS = [
   },
 ];
 
+const CATALOGO_LECTURAS = [...CATALOGO_BASE, ...LECTURAS_NUEVAS, ...LECTURAS_RESERVA];
+
 function normalizar(valor) {
   return String(valor ?? '')
     .normalize('NFD')
@@ -115,6 +119,10 @@ function normalizar(valor) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+export function claveLectura({ titulo, autor } = {}) {
+  return `${normalizar(titulo)}|${normalizar(autor)}`;
 }
 
 function rutaSegura(archivo) {
@@ -126,6 +134,27 @@ function rutaSegura(archivo) {
   }
 
   return ruta;
+}
+
+function lecturaDisponible(lectura) {
+  if (lectura.validado === false || !(Number(lectura.paginas) > 0)) {
+    return null;
+  }
+
+  const ruta = rutaSegura(lectura.archivo);
+
+  if (!ruta || !existsSync(ruta) || statSync(ruta).size < 1000) {
+    return null;
+  }
+
+  return ruta;
+}
+
+export function listarCatalogoLecturas() {
+  return CATALOGO_LECTURAS.map((lectura) => {
+    const ruta = lecturaDisponible(lectura);
+    return { ...lectura, ruta, disponible: Boolean(ruta) };
+  });
 }
 
 export function resolverLectura({ titulo, autor } = {}) {
@@ -144,11 +173,6 @@ export function resolverLectura({ titulo, autor } = {}) {
     return null;
   }
 
-  const ruta = rutaSegura(lectura.archivo);
-
-  if (!ruta || !existsSync(ruta)) {
-    return null;
-  }
-
-  return { ...lectura, ruta };
+  const ruta = lecturaDisponible(lectura);
+  return ruta ? { ...lectura, ruta } : null;
 }

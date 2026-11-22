@@ -20,6 +20,7 @@ router.get('/health', (req, res) => {
     database: dbStates[mongoose.connection.readyState] ?? 'unknown',
     pagos: modoPagos(),
     email: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
+    commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local',
     timestamp: new Date().toISOString(),
   });
 });

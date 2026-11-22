@@ -4,33 +4,14 @@ import EstadoAutomatizacion from '../models/estado-automatizacion.js';
 import Libro from '../models/libro.js';
 import RegistroMantenimiento from '../models/registro-mantenimiento.js';
 import Resena from '../models/resena.js';
-import { GENEROS, obtenerLibrosParaGenero } from './libros-externos.service.js';
+import { ejecutarGeneracionCatalogo, obtenerResumenCatalogo } from './generacion-catalogo.service.js';
 
 const ZONA_HORARIA = 'America/Bogota';
-const CANTIDAD_DIARIA = 10;
 const INTERVALO_GENERACION_MS = 24 * 60 * 60 * 1000;
 const CLAVE_ESTADO = 'principal';
 const BASE_INTERNA = `http://127.0.0.1:${process.env.PORT || 3000}/api`;
 
 let tareasIniciadas = false;
-
-function fechaBogota(fecha = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: ZONA_HORARIA,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(fecha);
-}
-
-function slug(texto) {
-  return String(texto)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
 
 function recortarErrores(errores, maximo = 30) {
   return [...new Set(errores.filter(Boolean))].slice(0, maximo);
@@ -64,10 +45,6 @@ async function obtenerEstado() {
   }
 
   return estado;
-}
-
-function generoEnIndice(indice) {
-  return GENEROS[((indice % GENEROS.length) + GENEROS.length) % GENEROS.length];
 }
 
 async function pedirJsonLocal(ruta, tiempoMaximo = 30000) {
@@ -252,192 +229,19 @@ export async function ejecutarRevision() {
   }
 }
 
-export async function ejecutarGeneracionDiaria({ forzar = false } = {}) {
-  const inicio = new Date();
-  let estado;
-  let totalAntes = 0;
-
-  try {
-    estado = await obtenerEstado();
-
-    const recientes = await Libro.countDocuments({
-      origen: 'automatico',
-      createdAt: { $gte: new Date(Date.now() - INTERVALO_GENERACION_MS) },
-    });
-
-    if (!forzar && recientes >= CANTIDAD_DIARIA) {
-      console.log('Generación diaria omitida: ya se agregaron los libros de las últimas 24 horas');
-      return { omitido: true, motivo: 'limite-24h', agregados: recientes };
-    }
-
-    if (
-      !forzar &&
-      estado.ultimaGeneracion &&
-      Date.now() - estado.ultimaGeneracion.getTime() < INTERVALO_GENERACION_MS
-    ) {
-      console.log('Generación diaria omitida: última ejecución hace menos de 24 horas');
-      return { omitido: true, motivo: 'ultima-ejecucion' };
-    }
-
-    if (estado.generacionEnCurso) {
-      console.log('Generación diaria omitida: ya hay una ejecución en curso');
-      return { omitido: true, motivo: 'en-curso' };
-    }
-
-    const bloqueo = await EstadoAutomatizacion.findOneAndUpdate(
-      { clave: CLAVE_ESTADO, generacionEnCurso: false },
-      {
-        $set: {
-          generacionEnCurso: true,
-          inicioGeneracion: inicio,
-          ultimoIntentoGeneracion: inicio,
-        },
-      },
-      { returnDocument: 'after' }
-    );
-
-    if (!bloqueo) {
-      return { omitido: true, motivo: 'bloqueo' };
-    }
-
-    const genero = generoEnIndice(bloqueo.indiceGenero);
-    const lote = `${fechaBogota(inicio)}-${slug(genero.nombre)}`;
-    const objetivo = forzar ? CANTIDAD_DIARIA : Math.max(CANTIDAD_DIARIA - recientes, 1);
-    totalAntes = await Libro.countDocuments();
-
-    console.log(
-      `Iniciando generación diaria: ${genero.nombre} (${lote}, ${objetivo} libros)`
-    );
-
-    const resultado = await obtenerLibrosParaGenero(genero.nombre, objetivo);
-    const agregados = [];
-    const errores = [...resultado.errores];
-
-    for (const datos of resultado.libros) {
-      try {
-        const libro = await Libro.create({ ...datos, lote });
-        agregados.push({
-          libro: libro._id,
-          titulo: libro.titulo,
-          autor: libro.autor,
-          fuente: libro.fuente,
-          fuenteId: libro.fuenteId,
-        });
-      } catch (error) {
-        if (error.code === 11000) {
-          errores.push(`Duplicado evitado: ${datos.titulo}`);
-        } else {
-          errores.push(`No se pudo guardar ${datos.titulo}: ${error.message}`);
-        }
-      }
-
-      if (agregados.length >= objetivo) {
-        break;
-      }
-    }
-
-    const totalDespues = await Libro.countDocuments();
-    const totalHoy = recientes + agregados.length;
-    const completo = totalHoy >= CANTIDAD_DIARIA;
-    const estadoFinal = completo ? (errores.length ? 'advertencia' : 'ok') : 'error';
-    const avanzar = completo;
-    const nuevoIndice = avanzar
-      ? (bloqueo.indiceGenero + 1) % GENEROS.length
-      : bloqueo.indiceGenero % GENEROS.length;
-    const nuevoCiclo =
-      avanzar && nuevoIndice === 0 ? (bloqueo.ciclo ?? 1) + 1 : bloqueo.ciclo ?? 1;
-    const fin = new Date();
-
-    await EstadoAutomatizacion.updateOne(
-      { clave: CLAVE_ESTADO },
-      {
-        $set: {
-          indiceGenero: nuevoIndice,
-          ciclo: nuevoCiclo,
-          ...(completo ? { ultimaGeneracion: fin } : {}),
-          generacionEnCurso: false,
-          inicioGeneracion: null,
-          ultimoEstado: estadoFinal,
-        },
-        $inc: { totalGenerado: agregados.length },
-      }
-    );
-
-    await guardarRegistro({
-      tipo: 'generacion',
-      estado: estadoFinal,
-      inicio,
-      fin,
-      duracionMs: fin.getTime() - inicio.getTime(),
-      genero: genero.nombre,
-      siguienteGenero: generoEnIndice(nuevoIndice).nombre,
-      totalLibrosAntes: totalAntes,
-      totalLibrosDespues: totalDespues,
-      agregados,
-      errores: recortarErrores(errores),
-      detalle: {
-        lote,
-        solicitados: objetivo,
-        agregados: agregados.length,
-        totalHoy,
-        completo,
-        advertencias: recortarErrores(resultado.advertencias),
-      },
-    });
-
-    console.log(
-      `Generación diaria ${genero.nombre}: ${agregados.length}/${objetivo} libros (hoy ${totalHoy}/${CANTIDAD_DIARIA}, ${estadoFinal})`
-    );
-
-    return {
-      agregados: agregados.length,
-      genero: genero.nombre,
-      estado: estadoFinal,
-      totalHoy,
-    };
-  } catch (error) {
-    const fin = new Date();
-    const errores = [`Fallo general de generación: ${error.message}`];
-
-    await EstadoAutomatizacion.updateOne(
-      { clave: CLAVE_ESTADO },
-      {
-        $set: {
-          generacionEnCurso: false,
-          inicioGeneracion: null,
-          ultimoIntentoGeneracion: fin,
-          ultimoEstado: 'error',
-        },
-      }
-    ).catch(() => {});
-
-    await guardarRegistro({
-      tipo: 'generacion',
-      estado: 'error',
-      inicio,
-      fin,
-      duracionMs: fin.getTime() - inicio.getTime(),
-      genero: estado ? generoEnIndice(estado.indiceGenero).nombre : undefined,
-      totalLibrosAntes: totalAntes || undefined,
-      totalLibrosDespues: await Libro.countDocuments().catch(() => undefined),
-      errores,
-    });
-
-    console.error('Error en la generación diaria:', error);
-    return { error: error.message };
-  }
+export async function ejecutarGeneracionDiaria(opciones = {}) {
+  return ejecutarGeneracionCatalogo(opciones);
 }
 
 export async function obtenerEstadoMantenimiento() {
   const estado = await obtenerEstado();
   const totalLibros = await Libro.countDocuments();
-  const generoActual = generoEnIndice(estado.indiceGenero);
-  const siguienteGenero = generoEnIndice(estado.indiceGenero + 1);
+  const catalogo = await obtenerResumenCatalogo();
   const ultimos = await RegistroMantenimiento.find().sort({ createdAt: -1 }).limit(10).lean();
 
   return {
-    generoActual: generoActual.nombre,
-    siguienteGenero: siguienteGenero.nombre,
+    generoActual: 'Catálogo validado',
+    siguienteGenero: 'Catálogo validado',
     ciclo: estado.ciclo,
     indiceGenero: estado.indiceGenero,
     generacionEnCurso: estado.generacionEnCurso,
@@ -446,6 +250,7 @@ export async function obtenerEstadoMantenimiento() {
     ultimoEstado: estado.ultimoEstado,
     totalGenerado: estado.totalGenerado,
     totalLibros,
+    ...catalogo,
     ultimos,
   };
 }
@@ -497,12 +302,16 @@ export function iniciarAutomatizacion() {
   );
 
   setTimeout(() => {
-    ejecutarRevision().catch((error) =>
-      console.error('Error en la revisión inicial:', error)
-    );
+    ejecutarRevision()
+      .catch((error) => console.error('Error en la revisión inicial:', error))
+      .finally(() => {
+        programarProximaGeneracion().catch((error) =>
+          console.error('No se pudo programar la generación validada:', error)
+        );
+      });
   }, 15000);
 
   console.log(
-    `Automatización iniciada: revisión cada hora; generación automática deshabilitada (${ZONA_HORARIA})`
+    `Automatización iniciada: revisión cada hora; generación validada cada 24 h (${ZONA_HORARIA})`
   );
 }
